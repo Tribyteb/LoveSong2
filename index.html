@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bizim Anı Defterimiz</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #e3ded7;
+            background-image: radial-gradient(#d3cbb1 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        /* Ana Defter Konteyneri */
+        .book-container {
+            width: 100%;
+            max-width: 1100px;
+            height: 780px;
+            position: relative;
+            perspective: 1500px;
+        }
+
+        /* Defter Kapak / Gövde Alanı */
+        .book {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.25), 
+                        inset 0 0 40px rgba(0,0,0,0.05);
+            border-radius: 12px;
+            background: #fbf9f3;
+        }
+
+        /* Ortadaki Cilt Çizgisi */
+        .book::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 10px;
+            height: 100%;
+            background: linear-gradient(to right, rgba(0,0,0,0.15), rgba(0,0,0,0.02) 20%, rgba(0,0,0,0.02) 80%, rgba(0,0,0,0.15));
+            z-index: 10;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        /* Yaprak (Spread) Yapısı */
+        .spread {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            display: flex;
+            opacity: 0;
+            pointer-events: none;
+            transition: none;
+            z-index: 1;
+        }
+
+        .spread.active {
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 5;
+        }
+
+        /* Yaprak Değişimi Sırasındaki Sağ Üst Köşe Kıvrılma Efekti (Peel) */
+        .spread.peeling-out {
+            animation: peelAway 1.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            pointer-events: none;
+            z-index: 6;
+            opacity: 1;
+        }
+
+        @keyframes peelAway {
+            0% {
+                clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+                transform: rotate(0deg) translate(0px, 0px);
+                transform-origin: bottom left;
+            }
+            30% {
+                box-shadow: -10px 10px 30px rgba(0,0,0,0.3);
+            }
+            100% {
+                clip-path: polygon(0% 0%, 0% 0%, 100% 100%, 0% 100%);
+                transform: rotate(-12deg) translate(-120%, -30px);
+                opacity: 0;
+            }
+        }
+
+        /* Sayfalar (Sol ve Sağ) */
+        .page {
+            width: 50%;
+            height: 100%;
+            padding: 40px 45px;
+            overflow-y: auto;
+            background-color: #fcfbf7;
+            position: relative;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
+        }
+
+        .page-left {
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+            border-right: 1px solid rgba(0,0,0,0.05);
+            padding-right: 50px;
+        }
+
+        .page-right {
+            border-top-right-radius: 12px;
+            border-bottom-right-radius: 12px;
+            border-left: 1px solid rgba(0,0,0,0.05);
+            padding-left: 50px;
+        }
+
+        /* Sağ üst köşedeki interaktif kıvırma alanı (Buton/Tetikleyici) */
+        .corner-flip-trigger {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 70px;
+            height: 70px;
+            cursor: pointer;
+            z-index: 100;
+            background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.03) 50%, rgba(0,0,0,0.08) 100%);
+            border-bottom-left-radius: 60px;
+            transition: all 0.4s ease;
+        }
+
+        .corner-flip-trigger::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 0 0 0;
+            border-color: transparent transparent #e6e0d4 transparent;
+            filter: drop-shadow(-3px 3px 5px rgba(0,0,0,0.15));
+            transition: all 0.4s ease;
+        }
+
+        .corner-flip-trigger:hover::before {
+            border-width: 0 35px 35px 0;
+            border-color: transparent transparent #ebd9c5 transparent;
+        }
+
+        /* Navigasyon Alt Barı */
+        .controls {
+            position: absolute;
+            bottom: -55px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .btn-nav {
+            background: #4a3e3d;
+            color: #fff;
+            border: none;
+            padding: 10px 22px;
+            font-size: 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            font-weight: 600;
+        }
+
+        .btn-nav:hover {
+            background: #615251;
+            transform: translateY(-2px);
+        }
+
+        .page-counter {
+            font-size: 15px;
+            color: #4a3e3d;
+            font-weight: 600;
+            background: rgba(255,255,255,0.6);
+            padding: 5px 15px;
+            border-radius: 15px;
+        }
+
+        /* Tipografi & Genel Tasarım Öğeleri */
+        h1, h2, h3 {
+            color: #2c1a1d;
+            font-family: 'Georgia', serif;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+
+        h1 { font-size: 26px; font-weight: 700; border-bottom: 2px dashed #d1c2b5; padding-bottom: 10px; }
+        h2 { font-size: 22px; color: #4a3333; }
+
+        p.quote {
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            color: #5c4a4a;
+            font-size: 15px;
+            line-height: 1.7;
+            margin-bottom: 18px;
+            position: relative;
+            padding-left: 15px;
+            border-left: 3px solid #c9b19f;
+        }
+
+        /* Fotoğraf Alanları (Grid ve Kareler) */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .photo-grid-5 {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+        }
+        .photo-grid-5 .photo-box:nth-child(1) { grid-column: span 3; }
+        .photo-grid-5 .photo-box:nth-child(2) { grid-column: span 3; }
+        .photo-grid-5 .photo-box:nth-child(3) { grid-column: span 2; }
+        .photo-grid-5 .photo-box:nth-child(4) { grid-column: span 2; }
+        .photo-grid-5 .photo-box:nth-child(5) { grid-column: span 2; }
+
+        .photo-grid-6 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .photo-box {
+            background: #fff;
+            border: 1px solid #e3dec3;
+            padding: 10px 10px 15px 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+            border-radius: 4px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.3s ease;
+        }
+        
+        .photo-box:hover {
+            transform: scale(1.02) rotate(1deg);
+        }
+
+        .img-wrapper {
+            width: 100%;
+            height: 130px;
+            background: #f4f1ea;
+            border: 1px solid #e0d8cb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #b0a390;
+            font-size: 12px;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        /* Büyük resimler için ayar */
+        .large-photo-box .img-wrapper {
+            height: 320px;
+        }
+
+        .photo-box-medium .img-wrapper {
+            height: 180px;
+        }
+
+        .note-area {
+            margin-top: 8px;
+            border-bottom: 1px dashed #b8aba0;
+            width: 100%;
+            font-size: 13px;
+            color: #554a42;
+            text-align: center;
+            background: transparent;
+            padding: 2px 0;
+            font-style: italic;
+            min-height: 24px;
+        }
+
+        /* Kod Editörü Görünümü (Mühendislik Dokunuşu) */
+        .code-container {
+            background: #282c34;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            color: #abb2bf;
+            margin: 15px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .code-keyword { color: #c678dd; font-weight: bold; }
+        .code-func { color: #61afef; }
+        .code-str { color: #98c379; }
+        .code-comment { color: #5c6370; font-style: italic; }
+        .code-bool { color: #d19a66; }
+
+        /* Emoji Süslemeleri */
+        .emoji-bar {
+            font-size: 24px;
+            margin: 12px 0;
+            letter-spacing: 8px;
+            text-align: center;
+            opacity: 0.85;
+        }
+
+        /* Not Defteri Görünümü (Can Bonomo Alanı) */
+        .notepad {
+            background: #fff8db;
+            border-left: 5px solid #ffcc00;
+            padding: 15px;
+            margin: 15px 0;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.05);
+            border-radius: 0 8px 8px 0;
+        }
+        .notepad p {
+            font-family: 'Georgia', serif;
+            font-style: italic;
+            color: #4a4530;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Eskişehir Bölümü Özel Teması */
+        .eskisehir-theme {
+            background: #111 !important;
+            color: #fff !important;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #e60000;
+            margin: 15px 0;
+        }
+        .eskisehir-theme h3 { color: #e60000; text-align: center; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+        .chant-text {
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            color: #fff;
+            letter-spacing: 1px;
+            line-height: 1.6;
+            text-transform: uppercase;
+            border-top: 1px solid #e60000;
+            border-bottom: 1px solid #e60000;
+            padding: 10px 0;
+            margin: 10px 0;
+        }
+
+        /* Sol Sayfa Boş/Dekoratif Çerçeve Tasarımı (1. Sayfa) */
+        .empty-frame-container {
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px dashed #d6cfc7;
+            border-radius: 8px;
+            background: #faf8f5;
+            position: relative;
+        }
+        .empty-frame-container::before {
+            content: '🌸';
+            font-size: 40px;
+            opacity: 0.3;
+        }
+
+        /* Büyük Tekli Fotoğraf Alanları */
+        .large-photo-box {
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        /* Mobil Uyumluluk */
+        @media (max-width: 850px) {
+            body {
+                padding: 10px;
+                align-items: flex-start;
+            }
+            .book-container {
+                height: auto;
+                max-width: 100%;
+                perspective: none;
+            }
+            .book {
+                height: auto;
+                box-shadow: none;
+                background: transparent;
+            }
+            .book::after {
+                display: none;
+            }
+            .spread {
+                position: relative;
+                display: none;
+                flex-direction: column;
+                height: auto;
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .spread.active {
+                display: flex;
+            }
+            .spread.peeling-out {
+                animation: none; /* Mobilde sade geçiş */
+                display: none;
+            }
+            .page {
+                width: 100%;
+                height: auto;
+                padding: 25px 20px;
+                border-radius: 12px !important;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+                border: 1px solid #eae5da;
+            }
+            .controls {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                background: rgba(255,255,255,0.95);
+                padding: 12px 20px;
+                box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+                z-index: 1000;
+                margin: 0;
+            }
+            .corner-flip-trigger {
+                display: none;
+            }
+            .photo-grid, .photo-grid-5, .photo-grid-6 {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+            .photo-grid-5 .photo-box:nth-child(1),
+            .photo-grid-5 .photo-box:nth-child(2),
+            .photo-grid-5 .photo-box:nth-child(3),
+            .photo-grid-5 .photo-box:nth-child(4),
+            .photo-grid-5 .photo-box:nth-child(5) {
+                grid-column: span 2 !important;
+            }
+            body {
+                padding-bottom: 80px;
+            }
+        }
+                /* ================= LIGHTBOX (MODAL) EFEKTİ ================= */
+        /* Resimlerin tıklanabilir olduğunu belirtelim */
+        .img-wrapper img {
+            cursor: pointer;
+        }
+
+        /* Modal Arka Planı */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            padding-top: 20px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); /* Arka plan karartması */
+            backdrop-filter: blur(4px); /* Romantik bir bulanıklık efekti */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Modal Görünür Olduğunda */
+        .modal-overlay.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 1;
+        }
+
+        /* Büyüyen Resmin Kendisi */
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            transform: scale(0.7);
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            object-fit: contain;
+        }
+
+        /* Resim Animasyonu */
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+
+        /* Kapatma Butonu (X) */
+        .close-modal {
+            position: absolute;
+            top: 25px;
+            right: 40px;
+            color: #f1f1f1;
+            font-size: 45px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+            z-index: 10000;
+        }
+
+        .close-modal:hover,
+        .close-modal:focus {
+            color: #d3cbb1;
+            text-decoration: none;
+        }
+
+        /* Mobilde Kapatma Butonunu Ayarlama */
+        @media (max-width: 850px) {
+            .close-modal {
+                top: 15px;
+                right: 20px;
+                font-size: 35px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="book-container">
+    <div class="book" id="album">
+        
+        <!-- Yaprak Değişimini Sağ Üst Köşeden Tetikleyen Görünmez Buton (Sadece Masaüstünde Aktif) -->
+        <div class="corner-flip-trigger" onclick="nextSpread()" title="Sonraki Sayfa"></div>
+
+        <!-- ================= YAPRAK 1 (SAYFA 1) ================= -->
+        <div class="spread active">
+            <!-- Sol Sayfa -->
+            <div class="page page-left">
+                <div class="empty-frame-container"></div>
+            </div>
+            <!-- Sağ Sayfa -->
+            <div class="page page-right">
+                <h1>İyi Ki Doğdun Hayatımın Neşesi</h1>
+                <div class="large-photo-box">
+                    <div class="photo-box">
+                        <div class="img-wrapper">
+                            <img src="img/Baslik.jpg" alt="Ana Fotoğraf" onerror="this.style.display='none'">
+                            <span style="position:absolute;z-index:-1;">s1_ana.jpg eksik</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="quote">"Dünyam bir kez daha seninle şekillendi, seninle güzelleşip, anlam kazandı iyi ki varsın."</p>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 2 (SAYFA 2) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Üniversite Yıllarımız</h1>
+                <div class="code-container">
+                    <span class="code-keyword">def</span> <span class="code-func">UniversiteHayatınıGüzelleştir</span>():<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">if</span> work_time == <span class="code-bool">True</span>:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;get.idea()<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;work_hard()<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;study_and_take_class()<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">else</span>:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;find_a_new_place()<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;drink_coffee()<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;eat_dessert()<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;visit_every_corner_of_Muğla()
+                </div>
+                <p class="quote">"Seni biraz geç fark ettim ama umarım üniversite hayatının son yılını çok güzel geçirmeni sağlamışımdır."</p>
+                <p class="quote">"Hastalarla ilgilenişin, işini her açıdan en iyi yapmaya çabalayışın hala aklımda yer ediniyor."</p>
+                <p class="quote">"Muğlanın her parkında kafesinde bir anımız oldu. Hepsi sen kokuyor, burnumda hep sen tütüyor."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Anı Kareleri</h2>
+                <div class="photo-grid-5" style="margin-top: 20px;">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/1c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Askerlik Sonrası Endodonti Slaytı</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/1e.jpg" onerror="this.style.display='none'"></div><div class="note-area">Minik Hekimim İş Başında</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/1b.jpg" onerror="this.style.display='none'"></div><div class="note-area">Ayrılmaz Üçlü</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/1a.jpg" onerror="this.style.display='none'"></div><div class="note-area">Zorlu Hastalara Karşı</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/m0.jpg" onerror="this.style.display='none'"></div><div class="note-area">HALLEDEBİLİRİZ!!</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 3 (SAYFA 3) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Oyun Geceleri Vazgeçilmezimizdir</h1>
+                <div class="emoji-bar">🎮 🕹️ 🎲 ♟️ 👾</div>
+                <p class="quote">"The Past Within ve Bilardo ile başlayan tatlı oyun günlüklerimiz şimdi farklı şekillerde devam ediyor."</p>
+                <p class="quote">"Seninle bayıla bayıla oynadığım en güzel oyun It Takes Two, birbirimize dalaşmadan sinirlenmeden oynayamadığımız oyun da Overcooked! 2 :D bilgisayarda oynadığımız her oyun ağzımızda harika tatlar bıraktı."</p>
+                <p class="quote">"Bilardo demişken tabii ki de bowling, basketbol, voleybol, ip atlama, satranç deli dolu eğlendik."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Oyun Günlüklerimiz</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/2a.png" onerror="this.style.display='none'"></div><div class="note-area">Bulmacadan Bulmayacaya Koşturduk</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/2b.png" onerror="this.style.display='none'"></div><div class="note-area">Çekici Kadınlar İyi Satranç Oynarmış</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/2c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Bowling</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/2d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Deli Tavşan</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 4 (SAYFA 4) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Köşe Bucak Muğla</h1>
+                <div class="photo-box photo-box-medium" style="margin: 15px 0;">
+                    <div class="img-wrapper">
+                        <img src="img/3.jpg" onerror="this.style.display='none'">
+                    </div>
+                </div>
+                <p class="quote">"Yeri geldi dağa çıktık yeri geldi denize indik. Güldük saçmaladık daha nice yıllarımız böyle geçsin."</p>
+                <p class="quote">"Pek bir şey yoktu şehirde ama her yerde ayak izlerimiz var."</p>
+                <p class="quote">"Köyceğize de gittik gezmek için sıcaktan bunaldık ama ruhumuz yeşerdi."</p>
+                <p class="quote">"Soğuk mart akşamı gökovanın da tadını çıkardık sen biraz üşüsen de değerdi."</p>
+                <p class="quote">"Lighthouse'da az tatlı yiyip limonata içmedik hani, oturup bir de dizi izlerdik."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Muğla Maceraları</h2>
+                <div class="photo-grid-5">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/3a.jpg" onerror="this.style.display='none'"></div><div class="note-area">Gez Köyceğiz, Hazırla Çeyiz</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/3b.jpg" onerror="this.style.display='none'"></div><div class="note-area">Manzara İçin İnatçı Dağları Aştık</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/3c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Deli Yürüyüşlerimiz</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/3d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Ben Seni Isıtırım Hep<3</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/3e.jpg" onerror="this.style.display='none'"></div><div class="note-area">Söze Havalı Giyiniriz</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 5 (SAYFA 5) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>En Güzel Derlerse Sen, En Güzel Şehir Derlerse Yine Sen...</h1>
+                <h3 style="font-size: 14px; font-style: italic; color: #776666; margin-top:-10px;">ama İzmir de fena değil yani :)</h3>
+                
+                <div class="photo-box photo-box-medium" style="margin: 15px 0;">
+                    <div class="img-wrapper">
+                        <img src="img/5.jpeg" alt="İzmir Saat Kulesi" onerror="this.style.display='none'">
+                    </div>
+                </div>
+                <p class="quote">"İki defa gittiğimiz bu şehirde döndük dolaştık kendi başıma gitmediğim yerlere seninle birlikte geldim."</p>
+                <p class="quote">"Hayatta bazı şeyler yanındakiyle daha da güzelleşiyor işte."</p>
+                <p class="quote">"Ve ilk defa kostümlü olarak bir İzmirCon'a katıldım. Kostüm bahaneydi asıl olay gülüşlerinde ve heyecanında saklıydı."</p>
+            </div>
+            <div class="page page-right">
+                <h2>İzmir Günlerimiz</h2>
+                <div class="photo-grid-5">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/5a.jpg" onerror="this.style.display='none'"></div><div class="note-area">İlk Gelişimiz Asla Son Olmayacak</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/5b.jpeg" onerror="this.style.display='none'"></div><div class="note-area">İzmirCon u birbirine kattık</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/5c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Tabiki Kore</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/5d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Çıkanlar Evleniyormuş</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/5e.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Kumamsız Olmaz :P</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 6 (SAYFA 6) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Bitmez Tükenmez Bizim Anı Defterimiz</h1>
+                <div class="code-container">
+                    <span class="code-keyword">import</span> happy_life <span class="code-keyword">from</span> Cansu<br>
+                    <span class="code-keyword">for</span> distance <span class="code-keyword">in</span> range(get.CansuDistance()):<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;print(<span class="code-str">"All is well Thanks to my wife"</span>)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">if</span> distance == <span class="code-bool">0</span>:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(<span class="code-str">"Canım sevgilim iyi ki yanımdasın"</span>)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">elif</span> distance &lt; <span class="code-bool">50</span> <span class="code-keyword">and</span> distance &gt; <span class="code-bool">0</span>:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(<span class="code-str">"En azından yakın yerde güzelim benim"</span>)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">else</span>:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(<span class="code-str">"Özledim seni nerelere kayboldun ♥"</span>)
+                </div>
+                <p class="quote">"Hastalıkta ve sağlıkta demedik daha ama hastalıkta birbirimize baktık daima."</p>
+                <p class="quote">"Düğünleri sevmezdim senle birlikte dans etmeye başlayana dek."</p>
+                <p class="quote">"Tiyatro bilmezdim sen peşinden tatlı tatlı sürükleyene dek."</p>
+                <p class="quote">"Ve de en güzeli çiçek almazdım hiçbir kadına çiçeklerin yanında sönük kaldığını görene dek."</p>
+                <p class="quote">"İlk anneler günü hediyen bir çiçekti umarım çocuklarımız da anneler gününü güzel kutlar."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Geleceğe Doğru...</h2>
+                <div class="photo-grid-6">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/6a.jpg" onerror="this.style.display='none'"></div><div class="note-area">Hastalandığımda Pek Bir Güzel Baktın</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/6b.jpg" onerror="this.style.display='none'"></div><div class="note-area">EEyyyy Hamleeeeğtt.</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/6c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Düğünlerde Yanıma En Güzel Yakışan</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/6d.jpg" onerror="this.style.display='none'"></div><div class="note-area">2 Kraliçem Yan Yana</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/6e.jpg" onerror="this.style.display='none'"></div><div class="note-area">Yollar Senle Başka</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/6f.jpg" onerror="this.style.display='none'"></div><div class="note-area">Geleceğin En Güzel Annesi</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 7 (SAYFA 7) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Duyduğumuz Gururla Biz de Senle Mezun Olduk!</h1>
+                <div class="emoji-bar">📜 🎓 ✨ 🎆</div>
+                <p class="quote">"Her köşesinde sen varsın hayatımın, kendi mezuniyetimde giymediğim cübbeyi senin üzerinde çok havalı buldum."</p>
+                <p class="quote">"Gurur duydum, belki benim başarım değildi ama senin yaptıklarınla gurur duydum."</p>
+                <p class="quote">"Başarılarının devamını diliyorum umarım hayatımızda daha da büyük başarılarımız olur ve birlikte seviniriz."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Mezuniyet Günümüz</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/7a.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Bitirim 3lünün 2 si mezun oldu</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/7b.png" onerror="this.style.display='none'"></div><div class="note-area">Kalbimde 1 Okulda 3 </div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/7c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Şapkalar da Pek Yakışır</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/7d.png" onerror="this.style.display='none'"></div><div class="note-area">Mezuniyet Tekne Turu</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 8 (SAYFA 8) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Güzel Sevgilimin Şehri Gezmeye Değer Eskişehir</h1>
+                
+                <div class="eskisehir-theme">
+                    <h3>ESKİŞEHİRSPOR</h3>
+                    <div class="chant-text">
+                        Es Es Es Ki Ki Ki<br>
+                        Eski Eski Es!<br>
+                        Kırmızı Şimşekler!
+                    </div>
+                </div>
+
+                <p class="quote">"Eski dediler ama bizim anılarımız hep yeni."</p>
+                <p class="quote">"İnanır mısın ilk araba kazamı bu şehirde yaşadım."</p>
+                <p class="quote">"İlk deniz kızını da burada gördüm ve aşık oldum. Soran olursa fotoğrafı da yan tarafta."</p>
+                <p class="quote">"Dönme dolapta öpüşüp düğün arabasıyla fotoğraf çekindik. Senin doğduğun şehir seninle bir başka güzel."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Eskişehir Hatıraları</h2>
+                <div class="photo-grid-5">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/8a.jpg" onerror="this.style.display='none'"></div><div class="note-area">Cansu Paluk, Minik Deniz Kızı</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/8b.jpg" onerror="this.style.display='none'"></div><div class="note-area">Evet Abi Vurdular Abi</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/8c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Öptüm ki Öptüm kii</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/8d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Evlilik Arabamız</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/8e.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Evet Az İçtik</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 9 (SAYFA 9) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Karışık Güzel Anılar</h1>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9a.jpg" onerror="this.style.display='none'"></div><div class="note-area">Mangalda Et Kalbimde Cansu</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9b.jpg" onerror="this.style.display='none'"></div><div class="note-area">En Güzel Yemek Seninle Olanlar</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Güzel Sabah Kahvaltıları En İyisi</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9d.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Nasıl Da Mutlu Yemek Yerken</div></div>
+                </div>
+            </div>
+            <div class="page page-right">
+                <h2>Albümün Devamı</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9e.jpg" onerror="this.style.display='none'"></div><div class="note-area">Turgut Şelalesi</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9f.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Yılbaşına Süslerimizle Gireriz Artık</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9g.jpeg" onerror="this.style.display='none'"></div><div class="note-area">MUTLU YILLAR GÜZELİM</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/9h.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Ağacı Süslemişler ki Süslümü Öpeyim</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 10 (SAYFA 10) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Dilerim Ki Konserler Hiç Bitmez</h1>
+                
+                <div class="notepad">
+                    <p><strong>🎵 Can Bonomo - Tastamam</strong></p>
+                    <p>"Gözlerim kör, kulaklarım sağır<br>Ama aşkı duyuyorum bağır bağır<br>Tastamam aşk bu, başka bir şey değil..."</p>
+                </div>
+
+                <p class="quote">"Mavi Gri dinlerken sevgili olduk."</p>
+                <p class="quote">"Zeliha hocaya Can Bonomo dinlerken yakalandık"</p>
+                <p class="quote">"Manga ve Dolu Kadeh Ters Tut için dağlar aşıp Aydın'a gittik."</p>
+                <p class="quote">"Kahve festivali biletlerini kaç ay önceden aldık."</p>
+                <p class="quote">"Coştuk kudurduk, gözlerimiz birbirine kenetlenmişken çokça şarkılar söyledik."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Müzik ve Festival Günleri</h2>
+                <div class="photo-grid-5">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/10a.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Eskişehir Kahve Festivali</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/10b.jpg" onerror="this.style.display='none'"></div><div class="note-area">Can Bonomo Muğla</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/10c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Gözün Aydın DKTT</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/10d.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Kahvede Damgalandık</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/10e.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Hani Bizim Mavi Grimiz</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 11 (SAYFA 11) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Tatillerimizin Varış Noktası Marmaris ve Gökova</h1>
+                <div class="emoji-bar">🌊 🏖️ ☀️ 🌲</div>
+                <p class="quote">"İçimiz sıkıldı Gökovaya gittik."</p>
+                <p class="quote">"Kutlama yapacak olduk Marmarise gittik."</p>
+                <p class="quote">"Yeri geldi tam tersini yaptık ama bu iki ilçede saatler çok çabuk ilerledi hep ve biz o saatleri doya doya geçirdik."</p>
+            </div>
+            <div class="page page-right">
+                <h2>Deniz & Doğa Kaçamakları</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/11a.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Marmaris Tatilimiz</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/11b.jpg" onerror="this.style.display='none'"></div><div class="note-area">Yıldönümünde Deniz Kıyısı</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/11c.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Çokça Gezdik Ama Doymadık</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/11d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Kurban Olurum Sana</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 12 (SAYFA 12) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Yıldönümü Kutlamamız ve Sevgililer Günümüz Çok Güzel Değil Miydi?</h1>
+                <p class="quote">"İçimizde saklamışız bir yılın heyecanını, dışa vurumu pek bir güzel oldu."</p>
+                
+                <div class="photo-grid" style="margin-top:20px;">
+                    <div class="photo-box"><div class="img-wrapper photo-box-medium"><img src="img/12.jpeg" onerror="this.style.display='none'"></div></div>
+                    <div class="photo-box"><div class="img-wrapper photo-box-medium"><img src="img/12b.jpeg" onerror="this.style.display='none'"></div></div>
+                </div>
+            </div>
+            <div class="page page-right">
+                <h2>Özel Gün Anıları</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/12c.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Çocukluğumuzdan Kaybetmeyiz</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/12d.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Piyade, Piyale, Piyare Her Neyse :D</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/12e.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Arigato Gozaimasu Anata</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/12f.jpg" onerror="this.style.display='none'"></div><div class="note-area">Düğünsüz Olmaz</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 13 (SAYFA 13) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Mutluluğun Fotoğrafları</h1>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13a.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Gel Saklanacak Bir Yer</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13b.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Bulalım İkimiz Bir</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13c.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Sen Benim Sırdaşım Oll</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13d.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Bak Ne Kaldı İnadımdan</div></div>
+                </div>
+            </div>
+            <div class="page page-right">
+                <h2>Gülüşlerimiz</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13e.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Seni Soludum Dumanından</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13f.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Sen Benim Yanlışım Oll</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13g.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Belki Sen Varsın Diye</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/13h.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Belki Duyarsın Diye</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 14 (SAYFA 14) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Telefonun amacı önceden video izlemekti, şimdi ise seninle konuşmak...</h1>
+                <div class="photo-grid" style="margin-top: 30px;">
+                    <div class="photo-box"><div class="img-wrapper photo-box-medium"><img src="img/14a.jpg" onerror="this.style.display='none'"></div><div class="note-area">Becermişiz İşte Kalp Yapmışız</div></div>
+                    <div class="photo-box"><div class="img-wrapper photo-box-medium"><img src="img/14b.png" onerror="this.style.display='none'"></div><div class="note-area">Kuşunu Park Et de Hadi Foto</div></div>
+                </div>
+            </div>
+            <div class="page page-right">
+                <h2>Uzakları Yakın Eden Anlar</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/14c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Uykusuz Gecelerimiz Oldu</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/14d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Uykusuzluğumuzun Sebebi Fazla Aşk</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/14e.png" onerror="this.style.display='none'"></div><div class="note-area">Hııııh Olmamışşş</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/14f.jpg" onerror="this.style.display='none'"></div><div class="note-area">Dostum Bu Olay Efsane</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 15 (SAYFA 15) ================= -->
+        <div class="spread">
+            <div class="page page-left">
+                <h1>Bitmeyen Günlükler</h1>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15a.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Sevgililer Günü Özel Yemeği</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15b.jpg" onerror="this.style.display='none'"></div><div class="note-area">Sonsuz Gülüşlüm</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15c.jpg" onerror="this.style.display='none'"></div><div class="note-area">Rock'n Rolllllll</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15d.jpg" onerror="this.style.display='none'"></div><div class="note-area">Rengarenk Geleceklere</div></div>
+                </div>
+            </div>
+            <div class="page page-right">
+                <h2>Geleceğe Notlar</h2>
+                <div class="photo-grid">
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15e.png" onerror="this.style.display='none'"></div><div class="note-area">Evlilik Bekleniyor....</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15f.png" onerror="this.style.display='none'"></div><div class="note-area">Sonsuz Sevgimle </div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15g.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Ev tuttuk hihihiii</div></div>
+                    <div class="photo-box"><div class="img-wrapper"><img src="img/15h.jpeg" onerror="this.style.display='none'"></div><div class="note-area">Piknik Ve Olmazsa Olmaz Erik</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= YAPRAK 16 (SAYFA 16) ================= -->
+        <div class="spread">
+            <div class="page page-left" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                <h1 style="border:none; font-size: 28px;">Ve Daha Nice Güzel Anılara Sevgilim...</h1>
+                <div class="emoji-bar" style="font-size:40px; margin: 20px 0;">❤️ ✨ 🥂 🌸</div>
+                <h2 style="color:#bf360c; font-size:24px; font-weight:bold;">İYİ Kİ DOĞDUN İYİ Kİ VARSIN!</h2>
+            </div>
+            <div class="page page-right" style="background:#faf6ee; display:flex; justify-content:center; align-items:center;">
+                <div style="text-align:center; color:#8c7e6b; font-style:italic; border: 1px solid #ebd9c5; padding: 40px; border-radius: 8px; background:#fff;">
+                    <span style="font-size:48px;">📖</span>
+                    <p style="margin-top:15px; font-weight:600;">Bizim Hikayemiz</p>
+                    <p style="font-size:12px; margin-top:5px; color:#b0a390;">Her gün yeni bir sayfa...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-nav" onclick="prevSpread()">⬅️ Önceki</button>
+            <span class="page-counter" id="pageDisplay">Yaprak: 1 / 16</span>
+            <button class="btn-nav" onclick="nextSpread()">Sonraki ➡️</button>
+        </div>
+
+    </div>
+</div>
+
+<div id="imageModal" class="modal-overlay">
+    <span class="close-modal" onclick="closeModal()">&times;</span>
+    <img class="modal-content" id="expandedImg">
+
+<script>
+    let currentSpreadIdx = 0;
+    const spreads = document.querySelectorAll('.spread');
+    const totalSpreads = spreads.length;
+    const pageDisplay = document.getElementById('pageDisplay');
+
+    function updateDisplay() {
+        pageDisplay.innerText = `Yaprak: ${currentSpreadIdx + 1} / ${totalSpreads}`;
+    }
+
+    function nextSpread() {
+        if (currentSpreadIdx < totalSpreads - 1) {
+            const currentSpread = spreads[currentSpreadIdx];
+            currentSpread.classList.add('peeling-out');
+            setTimeout(() => {
+                currentSpread.classList.remove('active', 'peeling-out');
+                currentSpreadIdx++;
+                spreads[currentSpreadIdx].classList.add('active');
+                updateDisplay();
+            }, 1300);
+        }
+    }
+
+    function prevSpread() {
+        if (currentSpreadIdx > 0) {
+            spreads[currentSpreadIdx].classList.remove('active');
+            currentSpreadIdx--;
+            const prevSpread = spreads[currentSpreadIdx];
+            prevSpread.classList.remove('peeling-out');
+            prevSpread.classList.add('active');
+            updateDisplay();
+        }
+    } // prevSpread fonksiyonu burada kapanıyor.
+
+    // ================= LIGHTBOX MANTIĞI =================
+    const modal = document.getElementById("imageModal");
+    const modalImg = document.getElementById("expandedImg");
+    const allImages = document.querySelectorAll(".img-wrapper img");
+
+    // Tüm resimlere tıklama özelliği ekle
+    allImages.forEach(img => {
+        img.addEventListener("click", function() {
+            modal.style.display = "flex";
+            
+            // CSS animasyonunun (transition) çalışması için minik bir gecikme
+            setTimeout(() => {
+                modal.classList.add("show");
+            }, 10);
+            
+            // Tıklanan resmin kaynağını (.jpg, .png fark etmez) modal içindeki resme kopyala
+            modalImg.src = this.src; 
+        });
+    });
+
+    // Modalı Kapatma Fonksiyonu
+    function closeModal() {
+        modal.classList.remove("show");
+        
+        // Animasyon bitince display: none yap
+        setTimeout(() => {
+            modal.style.display = "none";
+            modalImg.src = ""; // Bellek sızıntısını önlemek için src'yi temizle
+        }, 300);
+    }
+
+    // Resmin dışındaki karartılı alana tıklanırsa da kapansın
+    modal.addEventListener("click", function(event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+</script>
+    </div>
+</body>
+</html>
